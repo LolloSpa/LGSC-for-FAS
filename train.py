@@ -1,6 +1,7 @@
 import paddle.fluid as fluid
 from models.scan import SCAN
 from utils.runner import Runnner
+from dataset.datasetbase import DatasetBase
 from dataset.faceforensics import FaceForensics
 
 model_cfg = dict(
@@ -64,25 +65,25 @@ extra_aug = dict(
         w_h=(0.12, 0.12))
 )
 
-data_root = 'Path/FaceForensics/data/'
-train_dataset = FaceForensics(
+data_root = 'AS_PROVA/'
+train_dataset = DatasetBase(
     img_prefix=data_root,
-    ann_file=data_root + 'train_add_train.txt',
-    mask_file=None,
+    ann_file=data_root + 'LABEL.txt',
+    #mask_file=None,
     img_scale=(224, 224),
     img_norm_cfg=dict(mean=(100, 100, 100), std=(80, 80, 80)),
     extra_aug=extra_aug,
-    crop_face=0.1,
+    #crop_face=0.1,
 )
 
-val_dataset = FaceForensics(
+val_dataset = DatasetBase(
     img_prefix=data_root,
-    ann_file=data_root + 'train_val_train.txt',
+    ann_file=data_root + 'LABEL.txt',
     img_scale=(224, 224),
     img_norm_cfg=dict(mean=(100, 100, 100), std=(80, 80, 80)),
     extra_aug=dict(),
     test_mode=True,
-    crop_face=0.1,
+    #crop_face=0.1,
 )
 
 
@@ -93,9 +94,9 @@ runner = Runnner(
     model,
     train_dataset,
     val_dataset=val_dataset,
-    batch_size=96,
+    batch_size=16,
     checkpoint_config=checkpoint_cfg,
     optimizer_config=optimizer_cfg)
 
-runner.train(max_epochs=15)
+runner.train(max_epochs=3)
 

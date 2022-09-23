@@ -1,6 +1,7 @@
 import paddle.fluid as fluid
 import paddle.fluid.dygraph.nn as nn
 import paddle.fluid.layers as L
+import numpy as np
 from utils import ConvModule, model_size
 from models.resnet import ResNet, BasicBlock, make_res_layer
 from models.triple_loss import TripletLoss
@@ -109,7 +110,7 @@ class SCAN(fluid.dygraph.Layer):
         self.head.init_weights()
         model_size(self)
 
-    def get_losses(self, out, cls_out, mask, gt_labels):
+    def get_losses_withmask(self, out, cls_out, mask, gt_labels):
         loss_cls = L.mean(L.cross_entropy(cls_out, gt_labels)) * self.train_cfg['w_cls']
         cue = out[-1] if self.train_cfg['with_mask'] else L.elementwise_mul(
             out[-1], L.cast(gt_labels, 'float32'), axis=0)
@@ -122,7 +123,20 @@ class SCAN(fluid.dygraph.Layer):
         loss = loss_cls + loss_reg + loss_tir
         return dict(loss_cls=loss_cls, loss_reg=loss_reg, loss_tir=loss_tir, loss=loss)
 
-    def forward(self, img, label, mask=None, return_loss=True):
+    def get_losses(self, out, cls_out, gt_labels):
+        loss_cls = L.mean(L.cross_entropy(cls_out, gt_labels)) * self.train_cfg['w_cls']
+        cue = out[-1] if self.train_cfg['with_mask'] else L.elementwise_mul(
+            out[-1], L.cast(gt_labels, 'float32'), axis=0)
+        num_reg = L.cast(L.reduce_sum(gt_labels) * cue.shape[1] * cue.shape[2] * cue.shape[3], 'float32')
+        #loss_reg = L.reduce_sum(L.abs(mask - cue)) / (num_reg + 1e-8) * self.train_cfg['w_reg']
+        loss_tir = 0
+        for feat in out[:-1]:
+            feat = L.squeeze(self.avgpool(feat), axes=[2, 3])
+            loss_tir += self.triple_loss(feat, gt_labels) * self.train_cfg['w_tri']
+        loss = loss_cls + loss_tir
+        return dict(loss_cls=loss_cls, loss_reg=np.array(0), loss_tir=loss_tir, loss=loss)
+
+    def forward_withmask(self, img, label, mask=None, return_loss=True):
         outs = self.backbone(img)
         outs = self.neck(outs)
         if return_loss:
@@ -137,4 +151,19 @@ class SCAN(fluid.dygraph.Layer):
         else:
             cue = L.abs(outs[-1]).numpy()
             return cue
-
+    
+    def forward(self, img, label, return_loss=True):
+        outs = self.backbone(img)
+        outs = self.neck(outs)
+        if return_loss:
+            s = img + outs[-1]
+            cls_out = self.avgpool(self.head(s)[-1])
+            cls_out = L.squeeze(cls_out, axes=[2, 3])
+            if self.dropout:
+                cls_out = L.dropout(cls_out, dropout_prob=self.dropout)
+            cls_out = self.fc(cls_out)
+            losses = self.get_losses(outs, cls_out, label)
+            return losses
+        else:
+            cue = L.abs(outs[-1]).numpy()
+            return cue

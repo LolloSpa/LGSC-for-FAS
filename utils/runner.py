@@ -100,8 +100,11 @@ class Runnner(object):
         log_infos = 'Epoch: {}, Iter: {}, ETA: {:.2f} hours, lr: {:.6f}, Best_score: {:.2f} |'.format(
             epoch, iter, eta / 3600, lr, best_score)
         for k, v in losses.items():
-            if not k == 'loss':
-                log_infos += ' {}: {:.5f},'.format(k, v.numpy()[0])
+            try:
+                if not k == 'loss':
+                    log_infos += ' {}: {:.5f},'.format(k, v.numpy()[0])
+            except:
+                pass
         log_infos += ' loss: {:.5f}'.format(losses['loss'].numpy()[0])
         return log_infos
 
@@ -120,7 +123,8 @@ class Runnner(object):
             os.makedirs(cue_dir)
         cv2.imwrite(os.path.join(cue_dir, '{}_imgcue_label_{}.png'.format(i, ll)), cues)
 
-    def _data_to_variable(self, datas):
+    ##due funzioni, la prima originale con la maschera
+    def _data_to_variable_with_mask(self, datas):
         imgs = np.array([data[0] for data in datas]).astype(np.float32)
         mask = np.array([data[1] for data in datas]).astype(np.float32)
         label = np.array([data[2] for data in datas]).astype(np.int64).reshape(-1, 1)
@@ -131,9 +135,17 @@ class Runnner(object):
         label.stop_gradient = True
         return imgs, mask, label
 
+    def _data_to_variable(self, datas):
+        imgs = np.array([data[0] for data in datas]).astype(np.float32)
+        label = np.array([data[1] for data in datas]).astype(np.int64).reshape(-1, 1)
+        imgs = fluid.dygraph.to_variable(imgs)
+        label = fluid.dygraph.to_variable(label)
+        label.stop_gradient = True
+        return imgs, label
+
     def test(self, is_show=False, thr='auto'):
         results = []
-        place = fluid.CUDAPlace(0)
+        place = fluid.CPUPlace()
         
         with fluid.dygraph.guard(place):
             self.init_model()
@@ -180,13 +192,13 @@ class Runnner(object):
     def train(self, max_epochs):
         best_iter = 0
         best_score = 0
-        place = fluid.CUDAPlace(fluid.dygraph.parallel.Env().dev_id) if self.multi_gpus else fluid.CUDAPlace(0)
+        place = fluid.CUDAPlace(fluid.dygraph.parallel.Env().dev_id) if self.multi_gpus else fluid.CPUPlace()
         with fluid.dygraph.guard(place):
             train_loader = paddle.batch(self.dataset.train(), batch_size=self.batch_size, drop_last=True)
             #train_loader = self.dataset.data_loader(batch_size=self.batch_size, place=place)
             iter_per_epoch = int(self.dataset.length()/self.batch_size)
 
-            self.init_model()
+            #self.init_model()
             if self.multi_gpus:
                 train_loader = fluid.contrib.reader.distributed_batch_reader(train_loader)
                 strategy = fluid.dygraph.parallel.prepare_context()
@@ -213,9 +225,9 @@ class Runnner(object):
                             best_iter = iter
                             self.save_checkpoint(epoch, iter, is_best=True)
 
-                    imgs, mask, label = self._data_to_variable(datas)
+                    imgs, label = self._data_to_variable(datas)
 
-                    losses = self.model(imgs, label, mask=mask)
+                    losses = self.model(imgs, label)
                     loss = losses['loss']
 
                     if self.multi_gpus:

@@ -55,6 +55,9 @@ class PhotoMetricDistortion(object):
         self.hd = hue_delta
 
     def __call__(self, img, mask=None, label=None):
+
+        img = img.astype(np.float32)
+
         # random brightness
         if np.random.randint(2):
             delta = np.random.uniform(-self.bd, self.bd)

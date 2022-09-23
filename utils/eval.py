@@ -84,8 +84,8 @@ def eval_metric(results, thr='auto', type='acc', res_dir=None):
         eval_tool = eval_tools[type]
 
     if isinstance(thr, float):
-        results[:, 0] = (results[:, 0] > thr).astype(np.float)
-        results = results.astype(np.int)
+        results[:, 0] = (results[:, 0] > thr).astype(np.float64)
+        results = results.astype(np.int32)
         return eval_tool(results, is_print=True)
 
     min_score = results[:, 0].min()
@@ -97,8 +97,8 @@ def eval_metric(results, thr='auto', type='acc', res_dir=None):
         thre = min_score + i * s_step
         thrs.append(thre)
         result = results.copy()
-        result[:, 0] = (results[:, 0] > thre).astype(np.float)
-        result = result.astype(np.int)
+        result[:, 0] = (results[:, 0] > thre).astype(np.float64)
+        result = result.astype(np.int32)
         score = eval_tool(result, is_print=False)
         scores.append(score)
     max_ind = np.argmax(np.array(scores))
@@ -110,7 +110,7 @@ def eval_metric(results, thr='auto', type='acc', res_dir=None):
     print('Best Threshold: {:.4f}'.format(best_thr))
     save_results = np.zeros((results.shape[0], 3))
     save_results[:, 2] = results[:, 0]
-    results[:, 0] = (results[:, 0] > best_thr).astype(np.float)
+    results[:, 0] = (results[:, 0] > best_thr).astype(np.float64)
     save_results[:, :2] = results[:, :2]
     eval_score = eval_tool(results, is_print=True)
     if res_dir is not None:

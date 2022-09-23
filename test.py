@@ -1,6 +1,7 @@
 import paddle.fluid as fluid
 from models.scan import SCAN
 from utils.runner import Runnner
+from dataset.datasetbase import DatasetBase
 from dataset.faceforensics import FaceForensics
 
 model_cfg = dict(
@@ -64,16 +65,16 @@ extra_aug = dict(
         w_h=(0.12, 0.12))
 )
 
-data_root = 'Path/FaceForensics/data/'
-test_dataset = FaceForensics(
+data_root = 'AS_PROVA/'
+test_dataset = DatasetBase(
     img_prefix=data_root,
-    ann_file=data_root + 'faceforensics_benchmark.txt',
+    ann_file=data_root + 'LABEL.txt',
     #ann_file=data_root + 'c40_val.txt',
     img_scale=(224, 224),
     img_norm_cfg=dict(mean=(100, 100, 100), std=(80, 80, 80)),
     extra_aug=dict(),
     test_mode=True,
-    crop_face=0.10,
+    #crop_face=0.10,
 )
 
 
